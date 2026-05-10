@@ -13,8 +13,6 @@ set -e
 
 TARGET="${1:?Usage: $0 PI_USER@PI_HOST}"
 BACKEND_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-GITHUB_USERNAME=$(git -C "$BACKEND_DIR" remote get-url origin | sed 's/.*github.com[:/]\([^/]*\)\/.*/\1/')
-
 echo "==> Setting up asset-dashboard pipeline on $TARGET"
 
 # 1. Create pipeline directory (separate from existing compose project)
@@ -24,10 +22,7 @@ ssh "$TARGET" "mkdir -p ~/asset-dashboard-backend/data/{raw,output,processed}"
 scp "$BACKEND_DIR/docker-compose.yml" "$TARGET:~/asset-dashboard-backend/docker-compose.yml"
 scp "$BACKEND_DIR/.env"               "$TARGET:~/asset-dashboard-backend/.env"
 
-# 3. Inject GITHUB_USERNAME so the image reference resolves
-ssh "$TARGET" "grep -q GITHUB_USERNAME ~/asset-dashboard-backend/.env || echo 'GITHUB_USERNAME=$GITHUB_USERNAME' >> ~/asset-dashboard-backend/.env"
-
-# 4. Pull the image now so the first cron run doesn't wait
+# 3. Pull the image now so the first cron run doesn't wait
 ssh "$TARGET" "cd ~/asset-dashboard-backend && docker compose pull pipeline"
 
 # 5. Install cron jobs (Pi runs UTC; IST = UTC+5:30)
