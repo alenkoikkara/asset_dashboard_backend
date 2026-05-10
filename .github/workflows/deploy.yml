@@ -81,10 +81,11 @@ jobs:
             StrictHostKeyChecking no
           EOF
 
-      - name: Pull new image on Pi
+      - name: Deploy to Pi
         run: |
           ssh sshpi <<'EOF'
             cd ~/asset-dashboard-backend
-            docker compose pull pipeline
-            echo "Image updated — cron will use the new version on next run"
+            docker compose pull
+            docker compose up -d --no-deps --force-recreate asset-dashboard-api
+            echo "API restarted. Pipeline image updated — cron picks it up on next run."
           EOF

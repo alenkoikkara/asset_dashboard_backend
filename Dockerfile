@@ -11,8 +11,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY pipeline/ ./pipeline/
+COPY api/ ./api/
 
 # data/ is mounted at runtime — not baked into the image
 VOLUME ["/app/data"]
 
+# Default: run the ETL pipeline (overridden to uvicorn for the api service)
 CMD ["python", "-m", "pipeline.run"]

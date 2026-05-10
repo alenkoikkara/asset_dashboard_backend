@@ -1,4 +1,7 @@
 anthropic>=0.40.0
+apscheduler>=3.10.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
 pytest>=8.0.0
 kiteconnect>=5.0.0
 requests>=2.31.0
