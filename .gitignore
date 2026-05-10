@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Data files — raw CSVs and outputs stay local
+data/raw/*.csv
+data/output/*.db
+data/output/*.csv
+data/processed/
