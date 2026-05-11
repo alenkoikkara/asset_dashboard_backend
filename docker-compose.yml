@@ -1,7 +1,7 @@
 services:
   asset-dashboard-api:
     image: ghcr.io/alenkoikkara/asset-dashboard-backend:latest
-    container_name: asset-dashboard-api
+    container_name: asset-dashboard-apid
     command: uvicorn api.main:app --host 0.0.0.0 --port 8002
     env_file: .env
     volumes:
