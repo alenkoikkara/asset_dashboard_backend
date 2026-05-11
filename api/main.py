@@ -173,7 +173,19 @@ def get_portfolio():
     )
 
     holdings["_ts"] = pd.to_datetime(holdings["last_updated"], utc=True)
-    last_updated = fmt_dt(holdings["_ts"].max().to_pydatetime())
+    last_updated = holdings["_ts"].max().to_pydatetime().isoformat()
+
+    broker_alloc = (
+        holdings.groupby("broker")
+        .agg(
+            invested=("invested_value", "sum"),
+            current_value=("current_value", "sum"),
+            pnl=("unrealized_pnl", "sum"),
+        )
+        .reset_index()
+    )
+    broker_alloc["pnl_pct"] = (broker_alloc["pnl"] / broker_alloc["invested"] * 100).round(4)
+    broker_alloc = broker_alloc.round(2)
 
     return {
         "kpis": {
@@ -187,6 +199,7 @@ def get_portfolio():
         "last_updated": last_updated,
         "sector_allocation": json.loads(sector_alloc.to_json(orient="records")),
         "pnl_by_stock": json.loads(pnl_by_stock_df.to_json(orient="records")),
+        "broker_allocation": json.loads(broker_alloc.to_json(orient="records")),
     }
 
 
