@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-AssetClass = Literal["equity", "gold", "crypto", "mf", "etf"]
+AssetClass = Literal["equity", "gold", "crypto", "etf"]
 BrokerName = Literal["zerodha", "groww", "manual"]
 
 
