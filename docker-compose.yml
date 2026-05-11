@@ -1,12 +1,21 @@
 services:
-  pipeline:
+  asset-dashboard-api:
     image: ghcr.io/alenkoikkara/asset-dashboard-backend:latest
+    container_name: asset-dashboard-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8002
     env_file: .env
     volumes:
       - asset_dashboard_data:/app/data
-    restart: "no"   # one-shot job — cron triggers it, it exits when done
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    networks:
+      - app-network
 
 volumes:
-  # Named volume so the UI container (in the main compose) can mount the same data
   asset_dashboard_data:
     name: asset_dashboard_data
+
+networks:
+  app-network:
+    external: true
