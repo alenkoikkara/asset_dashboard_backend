@@ -243,3 +243,108 @@ def get_holding_detail(symbol: str):
         return {"brokers": []}
 
     return {"brokers": json.loads(rows.to_json(orient="records"))}
+
+
+@app.get("/api/benchmark")
+def get_benchmark(period: str = Query("1y")):
+    import yfinance as yf
+    from datetime import timedelta
+
+    end_dt = datetime.now()
+    if period == "1m":
+        start_dt = end_dt - timedelta(days=31)
+    elif period == "1y":
+        start_dt = end_dt - timedelta(days=366)
+    else:  # all — 5 years
+        start_dt = end_dt - timedelta(days=365 * 5)
+
+    holdings = read_holdings()
+    holding_info = (
+        holdings.groupby("symbol")
+        .agg(quantity=("quantity", "sum"))
+        .reset_index()
+    )
+
+    yf_symbols = [f"{s}.NS" for s in holding_info["symbol"].tolist()]
+    all_symbols = yf_symbols + ["^NSEI"]
+
+    empty_result = {
+        "series": [],
+        "summary": {
+            "portfolio_return": 0,
+            "nifty50_return": 0,
+            "start_date": None,
+            "end_date": None,
+        },
+    }
+
+    try:
+        raw = yf.download(
+            all_symbols,
+            start=start_dt.strftime("%Y-%m-%d"),
+            end=end_dt.strftime("%Y-%m-%d"),
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+        prices = raw["Close"] if "Close" in raw.columns else raw
+    except Exception:
+        return empty_result
+
+    if prices.empty:
+        return empty_result
+
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame()
+
+    prices = prices.ffill()
+
+    portfolio_value = pd.Series(0.0, index=prices.index)
+    for _, row in holding_info.iterrows():
+        yf_sym = f"{row['symbol']}.NS"
+        if yf_sym in prices.columns:
+            portfolio_value += prices[yf_sym] * row["quantity"]
+
+    nifty = prices.get("^NSEI")
+    if nifty is None:
+        return empty_result
+
+    # Keep only rows where portfolio has value
+    mask = portfolio_value > 0
+    portfolio_value = portfolio_value[mask]
+    nifty = nifty[mask]
+
+    if portfolio_value.empty:
+        return empty_result
+
+    portfolio_ret = ((portfolio_value / portfolio_value.iloc[0]) - 1) * 100
+    nifty_ret = ((nifty / nifty.iloc[0]) - 1) * 100
+
+    combined = pd.DataFrame(
+        {"portfolio": portfolio_ret.round(2), "nifty50": nifty_ret.round(2)}
+    ).dropna()
+
+    # Resample to weekly for all-time to reduce payload size
+    if period == "all" and len(combined) > 260:
+        combined = combined.resample("W").last().dropna()
+
+    combined.index = pd.DatetimeIndex(combined.index).strftime("%Y-%m-%d")
+
+    series = [
+        {
+            "date": date,
+            "portfolio": float(row["portfolio"]),
+            "nifty50": float(row["nifty50"]),
+        }
+        for date, row in combined.iterrows()
+    ]
+
+    return {
+        "series": series,
+        "summary": {
+            "portfolio_return": round(float(combined["portfolio"].iloc[-1]), 2) if series else 0,
+            "nifty50_return": round(float(combined["nifty50"].iloc[-1]), 2) if series else 0,
+            "start_date": series[0]["date"] if series else None,
+            "end_date": series[-1]["date"] if series else None,
+        },
+    }
