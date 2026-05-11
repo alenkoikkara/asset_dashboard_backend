@@ -84,8 +84,8 @@ jobs:
       - name: Deploy to Pi
         run: |
           ssh sshpi <<'EOF'
-            cd ~/asset-dashboard-backend
-            docker compose pull
+            cd ~
+            docker compose pull asset-dashboard-api
             docker compose up -d --no-deps --force-recreate asset-dashboard-api
-            echo "API restarted. Pipeline image updated — cron picks it up on next run."
+            echo "API restarted with updated image."
           EOF

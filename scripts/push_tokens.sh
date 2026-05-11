@@ -1,9 +1,9 @@
 #!/bin/bash
 # Run this each morning on your Mac after refreshing tokens.
-# Pushes the updated .env (with fresh Kite + Groww tokens) to the Pi.
+# Merges fresh Kite + Groww tokens into the Pi's ~/.env and restarts the container.
 #
 # Usage: ./scripts/push_tokens.sh PI_USER@PI_HOST
-#   e.g. ./scripts/push_tokens.sh pi@192.168.1.42
+#   e.g. ./scripts/push_tokens.sh charlie@raspberrypi.local
 
 set -e
 
@@ -20,9 +20,21 @@ echo "==> Generating fresh Groww token..."
 "$BACKEND_DIR/.venv/bin/python" "$BACKEND_DIR/scripts/generate_groww_token.py"
 
 echo ""
-echo "==> Pushing .env to Pi..."
-scp "$ENV_FILE" "$TARGET:~/asset-dashboard-backend/.env"
+echo "==> Merging tokens into Pi's ~/.env ..."
+scp "$ENV_FILE" "$TARGET:~/asset-dashboard.env"
+ssh "$TARGET" "
+  while IFS='=' read -r key value; do
+    [[ -z \"\$key\" || \"\$key\" == '#'* ]] && continue
+    if grep -q \"^\${key}=\" ~/.env 2>/dev/null; then
+      sed -i \"s|^\${key}=.*|\${key}=\${value}|\" ~/.env
+    else
+      echo \"\${key}=\${value}\" >> ~/.env
+    fi
+  done < ~/asset-dashboard.env
+  rm ~/asset-dashboard.env
+  cd ~
+  docker compose up -d --no-deps --force-recreate asset-dashboard-api
+"
 
 echo "==> Done. Tokens are live on the Pi."
-echo "    The pipeline will use them on the next cron run."
-echo "    To trigger immediately: ssh $TARGET 'cd ~/asset-dashboard-backend && docker compose run --rm pipeline'"
+echo "    To trigger pipeline now: curl -X POST 'http://raspberrypi.local:8002/api/pipeline/run?skip_ai=true'"
