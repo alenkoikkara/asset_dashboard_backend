@@ -13,6 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 DB_PATH = Path(__file__).parent.parent / "data" / "output" / "asset_dashboard.db"
 
+
+def fmt_dt(dt: datetime | str | None) -> str | None:
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        dt = datetime.fromisoformat(dt)
+    return dt.strftime("%d %b %y, %I:%M %p")
+
 # ── Pipeline state ────────────────────────────────────────────────────────────
 
 _state = {
@@ -21,6 +29,8 @@ _state = {
     "last_run_status": None,  # "success" | "error"
     "last_run_error": None,
 }
+
+_scheduler: AsyncIOScheduler | None = None
 
 
 async def _run_pipeline(skip_ai: bool = False) -> None:
@@ -47,16 +57,17 @@ async def _run_pipeline(skip_ai: bool = False) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = AsyncIOScheduler()
+    global _scheduler
+    _scheduler = AsyncIOScheduler()
     IST = "Asia/Kolkata"
 
-    scheduler.add_job(_run_pipeline, CronTrigger(hour=9,  minute=18, day_of_week="mon-fri", timezone=IST))
-    scheduler.add_job(_run_pipeline, CronTrigger(hour=12, minute=0,  day_of_week="mon-fri", timezone=IST))
-    scheduler.add_job(_run_pipeline, CronTrigger(hour=15, minute=35, day_of_week="mon-fri", timezone=IST))
+    _scheduler.add_job(_run_pipeline, CronTrigger(hour=9,  minute=18, day_of_week="mon-fri", timezone=IST))
+    _scheduler.add_job(_run_pipeline, CronTrigger(hour=12, minute=0,  day_of_week="mon-fri", timezone=IST))
+    _scheduler.add_job(_run_pipeline, CronTrigger(hour=15, minute=35, day_of_week="mon-fri", timezone=IST))
 
-    scheduler.start()
+    _scheduler.start()
     yield
-    scheduler.shutdown()
+    _scheduler.shutdown()
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -116,7 +127,19 @@ async def trigger_pipeline(skip_ai: bool = Query(False)):
 
 @app.get("/api/pipeline/status")
 def pipeline_status():
-    return _state
+    next_run_at = None
+    if _scheduler:
+        upcoming = [
+            job.next_run_time for job in _scheduler.get_jobs()
+            if job.next_run_time is not None
+        ]
+        if upcoming:
+            next_run_at = fmt_dt(min(upcoming))
+    return {
+        **_state,
+        "last_run_at": fmt_dt(_state["last_run_at"]),
+        "next_run_at": next_run_at,
+    }
 
 
 # ── Portfolio endpoints ───────────────────────────────────────────────────────
@@ -150,7 +173,7 @@ def get_portfolio():
     )
 
     holdings["_ts"] = pd.to_datetime(holdings["last_updated"], utc=True)
-    last_updated = holdings["_ts"].max().strftime("%d %b %Y, %I:%M %p UTC")
+    last_updated = fmt_dt(holdings["_ts"].max().to_pydatetime())
 
     return {
         "kpis": {
