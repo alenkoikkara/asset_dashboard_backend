@@ -245,6 +245,67 @@ def get_holding_detail(symbol: str):
     return {"brokers": json.loads(rows.to_json(orient="records"))}
 
 
+@app.get("/api/indices")
+def get_indices():
+    import yfinance as yf
+
+    INDICES = [
+        {
+            "key": "nifty50",
+            "name": "Nifty 50",
+            "ticker": "^NSEI",
+            "hours": "9:15 AM – 3:30 PM IST",
+            "extended": False,
+            "note": None,
+        },
+        {
+            "key": "banknifty",
+            "name": "Bank Nifty",
+            "ticker": "^NSEBANK",
+            "hours": "9:15 AM – 3:30 PM IST",
+            "extended": False,
+            "note": None,
+        },
+        {
+            "key": "giftnifty",
+            "name": "Gift Nifty",
+            "ticker": "^NSEI",
+            "hours": "6:00 AM – 11:30 PM IST",
+            "extended": True,
+            # Gift Nifty (NSE IFSC futures) has no Yahoo Finance ticker;
+            # Nifty 50 spot is shown as the nearest reference.
+            "note": "NSE IFSC · Nifty spot proxy",
+        },
+    ]
+
+    result = []
+    for idx in INDICES:
+        try:
+            fi = yf.Ticker(idx["ticker"]).fast_info
+            price = round(float(fi.last_price), 2)
+            prev = round(float(fi.previous_close), 2)
+            chg = round(price - prev, 2)
+            chg_pct = round((chg / prev) * 100, 2) if prev else 0.0
+        except Exception:
+            price = prev = chg = chg_pct = None
+
+        result.append(
+            {
+                "key": idx["key"],
+                "name": idx["name"],
+                "hours": idx["hours"],
+                "extended": idx["extended"],
+                "note": idx["note"],
+                "price": price,
+                "change": chg,
+                "change_pct": chg_pct,
+                "prev_close": prev,
+            }
+        )
+
+    return result
+
+
 @app.get("/api/benchmark")
 def get_benchmark(period: str = Query("1y")):
     import yfinance as yf
