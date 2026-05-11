@@ -10,7 +10,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 
 from pipeline import config
 from pipeline.enrichers.calendar import CalendarEnricher
@@ -65,8 +64,7 @@ def run(skip_ai: bool = False, dry_run: bool = False) -> list[Holding]:
     extractors = build_extractors()
     holdings = merge(extractors)
     if not holdings:
-        log.error("No holdings extracted — check CSV paths in .env")
-        sys.exit(1)
+        raise RuntimeError("No holdings extracted — check API credentials in .env")
 
     # Enrich
     for enricher in build_enrichers(skip_ai):
