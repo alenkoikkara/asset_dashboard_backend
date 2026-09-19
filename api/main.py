@@ -245,6 +245,7 @@ def get_holding_detail(symbol: str):
     return {"brokers": json.loads(rows.to_json(orient="records"))}
 
 
+
 @app.get("/api/indices")
 def get_indices():
     import yfinance as yf
